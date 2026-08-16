@@ -1,0 +1,99 @@
+name: Manual Unzip to Root
+
+on:
+  workflow_dispatch:   # Manual trigger
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true  # Mengatasi warning Node.js 20
+
+permissions:
+  contents: write
+
+jobs:
+  unzip:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0  # Ambil semua history untuk push
+
+      - name: List all ZIP files
+        run: |
+          echo "📦 Mencari file ZIP..."
+          find . -name "*.zip" -type f
+          echo ""
+
+      - name: Unzip all ZIP files to root
+        run: |
+          echo "🔓 Mulai extract ZIP ke root repo..."
+          
+          # Cari semua file ZIP dan extract
+          ZIP_FILES=$(find . -name "*.zip" -type f)
+          
+          if [ -z "$ZIP_FILES" ]; then
+            echo "⚠️ Tidak ada file ZIP yang ditemukan!"
+            exit 0
+          fi
+          
+          # Extract setiap file ZIP
+          for zipfile in $ZIP_FILES; do
+            echo "📂 Extracting: $zipfile"
+            unzip -o "$zipfile" -d . || echo "⚠️ Gagal extract $zipfile"
+          done
+          
+          echo "✅ Proses extract selesai!"
+
+      - name: Remove ZIP files (optional)
+        run: |
+          echo "🗑️ Menghapus file ZIP..."
+          ZIP_FILES=$(find . -name "*.zip" -type f)
+          
+          if [ -n "$ZIP_FILES" ]; then
+            find . -name "*.zip" -type f -delete
+            echo "✅ File ZIP telah dihapus"
+          else
+            echo "⚠️ Tidak ada file ZIP untuk dihapus"
+          fi
+
+      - name: Check for changes
+        id: check_changes
+        run: |
+          git add .
+          if git diff --staged --quiet; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "✨ Tidak ada perubahan untuk di-commit"
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "📝 Ada perubahan yang akan di-commit"
+          fi
+
+      - name: Commit changes
+        if: steps.check_changes.outputs.has_changes == 'true'
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          
+          # Commit perubahan
+          git commit -m "📦 Manual unzip to root - $(date +'%Y-%m-%d %H:%M:%S')"
+          
+          # Pull terlebih dahulu untuk hindari konflik
+          git pull --rebase origin ${GITHUB_REF_NAME} || echo "⚠️ Pull failed, tetap coba push"
+          
+          # Push perubahan
+          git push origin ${GITHUB_REF_NAME}
+          
+          echo "✅ Perubahan telah di-commit dan di-push"
+
+      - name: Unzip Summary
+        if: success()
+        run: |
+          echo "🎉 =================================="
+          echo "🎉 UNZIP PROCESS COMPLETED!"
+          echo "🎉 =================================="
+          echo "✅ Status: Success"
+          echo "📁 Root directory: $(pwd)"
+          echo "🔧 Action: Manual Unzip to Root"
+          echo "🎉 =================================="

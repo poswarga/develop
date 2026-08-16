@@ -1,0 +1,7 @@
+Setelah sql ini urut :
+Schema
+Primary key
+Indexes
+RLS Policies
+
+baru yajg sql aman per table
